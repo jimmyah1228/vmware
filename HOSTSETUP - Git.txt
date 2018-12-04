@@ -1,0 +1,40 @@
+$VMHost = Get-VMHost -Name "Name Here"
+$VS = Get-VirtualSwitch –name vSwitch0
+$Cluster = Get-Cluster -Name Clusername
+$VSwitch0 = Get-VirtualSwitch –name vSwitch0
+
+
+
+$VMHost | get-virtualswitch -Name vSwitch0 | New-VirtualPortGroup -Name x.x.x.x -vlanid 2
+
+
+#Configure NTP server
+$VMHost | Add-VmHostNtpServer -NtpServer us.pool.ntp.org
+
+#Allow NTP queries outbound through the firewall
+Get-VMHostFirewallException -VMHost $VMHost | where {$_.Name -eq "NTP client"} | Set-VMHostFirewallException -Enabled:$true
+
+#Start NTP client service and set to automatic
+$VMHost | Get-VmHostService | Where-Object {$_.key -eq "ntpd"} | Start-VMHostService
+$VMHost | Get-VmHostService | Where-Object {$_.key -eq "ntpd"} | Set-VMHostService -policy "on"
+
+
+#Set Jumbo Frames
+
+#$VMHost | Set-VirtualSwitch –VirtualSwitch vSwitch0 –mtu 9000
+#$VMHost | Get-VirtualSwitch –name vSwitchX
+
+# Enable VMotion
+$VMHost | Get-VMHostNetworkAdapter -VMKernel | Set-VMHostNetworkAdapter -VMotionEnabled $true -Confirm:$False
+
+
+#Enable SSH
+
+$VMHost | foreach { get-vmhostservice -VMHost $_.name | where {$_.Key -eq "TSM-SSH"} | Start-VMHostService}
+$VMHost | Get-VmHostService | Where-Object {$_.key -eq "TSM-SSH"} | Set-VMHostService -policy "on" 
+
+#Disable shell warning
+
+$VMHost | Get-AdvancedSetting UserVars.SuppressShellWarning | Set-AdvancedSetting -Value 1 -Confirm:$False
+
+
